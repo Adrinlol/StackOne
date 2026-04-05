@@ -1,0 +1,39 @@
+---
+description: StackOne frontend structure, Figma tokens, Tailwind, assets, and components
+alwaysApply: true
+---
+
+# StackOne frontend conventions
+
+## Components and files
+
+- **Reusable primitives** (button, input, generic patterns) live in `components/UI/` with **lowercase dash** filenames. **Sidebar-specific pieces** live under **`components/Sidebar/`**. **`components/Sidebar/index.tsx`** may export the shell **public surface** (`Sidebar`, `ShellChromeProvider`, `useShellChrome`, …); implementation stays in sibling files (`sidebar-client.tsx`, `shell-chrome-provider.tsx`, …).
+- **App shell / cross-route chrome** (e.g. main sidebar) lives at **`components/Sidebar/`** (or similar top-level under `components/`), **not** under a feature folder like `components/Logs/`. Feature folders hold only feature-specific UI.
+- **Logs (and other feature) UI** lives under `components/Logs/` (uppercase feature folder). Prefer **PascalCase subfolders** when the slice needs structure.
+- **Inside a feature folder**: colocate `constants.ts` / `helpers.ts` when needed; **entry = `index.tsx` or another real module**. If a piece is **reusable**, move it to `components/UI/` (or a shared module) instead of duplicating.
+- **App shell data (project/environment vs signed-in user)** stay **separate concerns**: types in **`types/sidebar-shell.ts`** (`ProjectEnvironmentSummary`, `AuthenticatedUserSummary`), loaders in **`lib/data/sidebar-shell.ts`**. **`app/layout.tsx`** (async) runs **`Promise.all`** on those loaders once, wraps the app in **`ShellChromeProvider`**, and renders **`<Sidebar />`**. Client code reads the same snapshot via **`useShellChrome`**, **`useProjectEnvironment`**, or **`useAuthenticatedUser`**. **HTTP**: **`GET /api/shell/project-environment`** and **`GET /api/shell/authenticated-user`** call the same loaders. Do not merge unrelated fields into one vague “context” type.
+- Use **descriptive field names** (e.g. `activeEnvironmentLabel`, `displayName`, `avatarInitial`).
+- **Identifiers (including callback parameters)**: use at least one **full word** so intent is obvious — e.g. `navSection` not `s`, `navItem` not `i`, `clickEvent` not `e` (unless the team’s established pattern is `event` / `error` for handlers). Avoid single-letter names except **index** loops where `index` / `itemIndex` is clearer than `i` when the body is non-trivial.
+- **`app/*/error.tsx` does not catch errors from the same segment’s `layout.tsx`**. Shell loaders live in **`app/layout.tsx`**; if they throw, add **`global-error`**, an error boundary, or handle errors inside loaders. For Route Handlers you add later: **`try/catch`**, log, return consistent JSON 5xx — no need for a helper until you have more than one route.
+- **No barrel `index.ts`** at **`constants/`** or **`types/`** roots — import from concrete files (e.g. `@/constants/navigation`, `@/types/sidebar-shell`).
+
+## Icons and static assets
+
+- **Icons and image assets live under `public/`** (e.g. `public/icons/nav/…`, `public/icons/ui/…`, `public/icons/brand/…`). Do **not** store icon SVGs or PNGs inside `components/` folders. Code may map ids to paths (e.g. in `components/Sidebar/constants.ts`) and render `<img>` or a small UI helper (e.g. mask-based icon) that references those URLs.
+- **Do not use** `https://www.figma.com/api/mcp/asset/…` URLs in the app: they are **not public** (unauthenticated requests get **404**). Ship icons as files under **`public/icons/`** (see `public/icons/SOURCE.txt` and `components/Sidebar/constants.ts`).
+
+## Theme
+
+- **Tailwind theme** is defined in `tailwind.config.js` (`theme.extend`). `app/globals.css` uses `@import "tailwindcss"` and `@config "../tailwind.config.js"`. Prefer semantic utilities (`text-secondary`, `bg-nav`, `border-border`, `bg-primary`, `shadow-button`, etc.).
+
+## Tailwind sizing
+
+- **Avoid arbitrary pixel utilities** like `h-[37px]` or `w-[240px]`. Prefer **standard scale classes** (`h-9`, `max-w-60`, `gap-4`, etc.) when they are close enough, or **rem-based arbitraries** (e.g. `h-[2.3125rem]`, `w-[15rem]`) when you need an exact design value.
+
+## Figma
+
+- When design colors change, update `tailwind.config.js`. Figma file key: optional **`FIGMA_FILE_KEY`** in `.env` (for MCP / tooling — not read by the Next.js app).
+
+## Routing (current scope)
+
+- **`/`** (`app/page.tsx`) is the **Logs** home surface. Other paths are normal Next routes (add `app/.../page.tsx` as you build them, or they **404**). Sidebar **Logs** uses **`href: "/"`**. Unbuilt routes use **`disabled: true`** in **`components/Sidebar/constants.ts`**.
